@@ -11,29 +11,60 @@ interface ScheduleType {
 
 dotenv.config();
 
-const app = express();
-
 const PORT = process.env.PORT || 3000;
-
 const config = {
   channelSecret: process.env.CHANNEL_SECRET,
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
 };
+const app = express();
+const client = new Client(config);
 
-app.get("/", (req, res) => res.send("🎉Success Deploy🎊"));
+app.get("/", (_, res) => res.send("🎉Success Deploy🎊"));
 app.post("/webhook", middleware(config), (req, res) => {
-  console.log(req.body.events);
-
   Promise.all(req.body.events.map(handleEvent)).then((result) =>
     res.json(result)
   );
 });
 
-const client = new Client(config);
+const handleEvent = async (event: any) => {
+  if (event.type !== "message" || event.message.type !== "text") {
+    return Promise.resolve(null);
+  }
 
-const scraping = async (userId: string) => {
-  const schedule: ScheduleType[] = [];
   let text = "";
+
+  if (event.message.text === "予定") {
+    // text = "積分中...";
+    const response = await scraping();
+    if (response) {
+      const schedule = analysis(response);
+      text = schedule.map((item) => `${item.time}${item.text}`).join("\n");
+    } else {
+      text = "問題が発生しました";
+    }
+  } else {
+    text = "負けるな！しょげるな！林瑠奈です！";
+  }
+
+  return client.replyMessage(event.replyToken, {
+    type: "text",
+    text,
+  });
+};
+
+const scraping = async () => {
+  try {
+    const response = await axios.get<string>(
+      "https://www.hinatazaka46.com/s/official/media/list"
+    );
+    return response.data;
+  } catch (error) {
+    return "";
+  }
+};
+
+const analysis = (response: string) => {
+  const schedule: ScheduleType[] = [];
 
   const categoryType: {
     [key: string]: string;
@@ -45,56 +76,22 @@ const scraping = async (userId: string) => {
     誕生日: "🎂",
   };
 
-  await axios
-    .get("https://www.hinatazaka46.com/s/official/media/list")
-    .then((res) => {
-      const $ = cheerio.load(res.data);
-      $(".p-schedule__item").each((_, element) => {
-        const time = $(element).find(".c-schedule__time--list").text().trim()
-          ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
-          : "";
-        const text = `${
-          categoryType[$(element).find(".c-schedule__category").text().trim()]
-        }${$(element).find(".c-schedule__text").text().trim()}\n`;
+  const $ = cheerio.load(response);
+  $(".p-schedule__item").each((_, element) => {
+    const time = $(element).find(".c-schedule__time--list").text().trim()
+      ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
+      : "";
+    const text = `${
+      categoryType[$(element).find(".c-schedule__category").text().trim()]
+    }${$(element).find(".c-schedule__text").text().trim()}\n`;
 
-        schedule.push({
-          time,
-          text,
-        });
-      });
-
-      text = schedule.map((item) => `${item.time}${item.text}`).join("\n");
-    })
-    .catch((error) => {
-      text = `エラーが発生しました\n${error}`;
+    schedule.push({
+      time,
+      text,
     });
-
-  console.log(schedule);
-
-  await client.pushMessage(userId, {
-    type: "text",
-    text,
   });
-};
 
-const handleEvent = async (event: any) => {
-  if (event.type !== "message" || event.message.type !== "text") {
-    return Promise.resolve(null);
-  }
-
-  let text = "";
-
-  if (event.message.text === "予定") {
-    text = "積分中...";
-    scraping(event.source.userId);
-  } else {
-    text = "負けるな！しょげるな！林瑠奈です！";
-  }
-
-  return client.replyMessage(event.replyToken, {
-    type: "text",
-    text,
-  });
+  return schedule;
 };
 
 app.listen(PORT);
