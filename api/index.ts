@@ -2,7 +2,12 @@ import axios from "axios";
 import cheerio from "cheerio";
 import dotenv from "dotenv";
 import express from "express";
-import { Client, middleware } from "@line/bot-sdk";
+import {
+  Client,
+  middleware,
+  WebhookEvent,
+  MessageAPIResponseBase,
+} from "@line/bot-sdk";
 
 interface ScheduleType {
   time: string;
@@ -12,21 +17,29 @@ interface ScheduleType {
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
+
 const config = {
-  channelSecret: process.env.CHANNEL_SECRET,
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.CHANNEL_SECRET || "",
+  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || "",
 };
+
 const app = express();
 const client = new Client(config);
 
+/** 表示確認用 */
 app.get("/", (_, res) => res.send("🎉Success Deploy🎊"));
+
+/** webhook周り */
 app.post("/webhook", middleware(config), (req, res) => {
-  Promise.all(req.body.events.map(handleEvent)).then((result) =>
+  Promise.all(req.body.events.map(replayMessage)).then((result) =>
     res.json(result)
   );
 });
 
-const handleEvent = async (event: any) => {
+/** 特定の文字列に反応し、リプライする */
+const replayMessage = async (
+  event: WebhookEvent
+): Promise<MessageAPIResponseBase> => {
   if (event.type !== "message" || event.message.type !== "text") {
     return Promise.resolve(null);
   }
@@ -34,7 +47,6 @@ const handleEvent = async (event: any) => {
   let text = "";
 
   if (event.message.text === "予定") {
-    // text = "積分中...";
     const response = await scraping();
     if (response) {
       const schedule = analysis(response);
@@ -52,6 +64,7 @@ const handleEvent = async (event: any) => {
   });
 };
 
+/** urlからスクレイピングした結果を文字列で返す */
 const scraping = async () => {
   try {
     const response = await axios.get<string>(
@@ -63,6 +76,7 @@ const scraping = async () => {
   }
 };
 
+/** 文字列をDOM解析し、整形する */
 const analysis = (response: string) => {
   const schedule: ScheduleType[] = [];
 
@@ -70,8 +84,9 @@ const analysis = (response: string) => {
     [key: string]: string;
   } = {
     テレビ: "📺",
+    WEB: "🖥",
     ラジオ: "📻",
-    配信: "🖥",
+    配信: "🚀",
     雑誌: "📖",
     誕生日: "🎂",
   };
