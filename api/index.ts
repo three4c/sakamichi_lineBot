@@ -1,7 +1,13 @@
+import axios from "axios";
+import cheerio from "cheerio";
 import dotenv from "dotenv";
 import express from "express";
-import puppeteer from "puppeteer";
 import { Client, middleware } from "@line/bot-sdk";
+
+interface ScheduleType {
+  time: string;
+  text: string;
+}
 
 dotenv.config();
 
@@ -14,7 +20,7 @@ const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
 };
 
-app.get("/", (req, res) => res.send("🎉 Success Deploy 🎊"));
+app.get("/", (req, res) => res.send("🎉Success Deploy🎊"));
 app.post("/webhook", middleware(config), (req, res) => {
   console.log(req.body.events);
 
@@ -26,52 +32,48 @@ app.post("/webhook", middleware(config), (req, res) => {
 const client = new Client(config);
 
 const scraping = async (userId: string) => {
-  const browser = await puppeteer.launch({ args: ["--lang=ja"] });
-  const page = await browser.newPage();
+  const schedule: ScheduleType[] = [];
+  let text = "";
 
-  /** cosole.logで値を確認 */
-  // page.on("console", (msg) => {
-  //   for (let i = 0; i < msg.args.length; ++i)
-  //     console.log(`${i}: ${msg.args[i]}`);
-  // });
+  const categoryType: {
+    [key: string]: string;
+  } = {
+    テレビ: "📺",
+    ラジオ: "📻",
+    配信: "🖥",
+    雑誌: "📖",
+    誕生日: "🎂",
+  };
 
-  await page.goto("https://www.nogizaka46.com/s/n46/", {
-    waitUntil: "networkidle0",
-  });
+  await axios
+    .get("https://www.hinatazaka46.com/s/official/media/list")
+    .then((res) => {
+      const $ = cheerio.load(res.data);
+      $(".p-schedule__item").each((_, element) => {
+        const time = $(element).find(".c-schedule__time--list").text().trim()
+          ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
+          : "";
+        const text = `${
+          categoryType[$(element).find(".c-schedule__category").text().trim()]
+        }${$(element).find(".c-schedule__text").text().trim()}\n`;
 
-  await page.waitForTimeout(1000);
+        schedule.push({
+          time,
+          text,
+        });
+      });
 
-  const data = await page.$$eval(".tp--sc__list .m--scone__a", (list) => {
-    const genreType: {
-      [key: string]: string;
-    } = {
-      TV: "📺",
-      WEB: "🖥",
-      ラジオ: "📻",
-      書籍: "📖",
-      誕生日: "🎂",
-    };
+      text = schedule.map((item) => `${item.time}${item.text}`).join("\n");
+    })
+    .catch((error) => {
+      text = `エラーが発生しました\n${error}`;
+    });
 
-    return list.map((item) => ({
-      start: item.querySelector(".m--scone__start")
-        ? `⏰${item.querySelector(".m--scone__start").textContent}\n`
-        : "",
-      title: `${
-        genreType[item.querySelector(".m--scone__cat__name").textContent]
-      }${item.querySelector(".m--scone__ttl").textContent}\n`,
-      href: `🔍${item.getAttribute("href")}\n`,
-    }));
-  });
-
-  await browser.close();
-
-  // console.log("data", data);
+  console.log(schedule);
 
   await client.pushMessage(userId, {
     type: "text",
-    text: data
-      .map((item) => `${item.start}${item.title}${item.href}`)
-      .join("\n"),
+    text,
   });
 };
 
@@ -80,18 +82,18 @@ const handleEvent = async (event: any) => {
     return Promise.resolve(null);
   }
 
-  let mes = "";
+  let text = "";
 
   if (event.message.text === "予定") {
-    mes = "積分中...";
+    text = "積分中...";
     scraping(event.source.userId);
   } else {
-    mes = "負けるな！しょげるな！林瑠奈です！";
+    text = "負けるな！しょげるな！林瑠奈です！";
   }
 
   return client.replyMessage(event.replyToken, {
     type: "text",
-    text: mes,
+    text,
   });
 };
 
