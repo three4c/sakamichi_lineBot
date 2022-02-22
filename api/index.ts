@@ -48,6 +48,7 @@ const replayMessage = async (
 
   if (event.message.text === "予定") {
     const response = await scraping();
+
     if (response) {
       const schedule = analysis(response);
       text = schedule.map((item) => `${item.time}${item.text}`).join("\n");
@@ -96,6 +97,7 @@ const analysis = (response: string) => {
     const time = $(element).find(".c-schedule__time--list").text().trim()
       ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
       : "";
+
     const text = `${
       categoryType[$(element).find(".c-schedule__category").text().trim()]
     }${$(element).find(".c-schedule__text").text().trim()}\n`;
