@@ -12,6 +12,7 @@ import {
 interface ScheduleType {
   time: string;
   text: string;
+  url: string;
 }
 
 dotenv.config();
@@ -51,7 +52,9 @@ const replayMessage = async (
 
     if (response) {
       const schedule = analysis(response);
-      text = schedule.map((item) => `${item.time}${item.text}`).join("\n");
+      text = schedule
+        .map((item) => `${item.time}${item.text}${item.url}`)
+        .join("\n");
     } else {
       text = "問題が発生しました";
     }
@@ -98,6 +101,10 @@ const analysis = (response: string) => {
       ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
       : "";
 
+    const url = `🔍https://www.hinatazaka46.com${$(element)
+      .find("a")
+      .attr("href")}\n`;
+
     const text = `${
       categoryType[$(element).find(".c-schedule__category").text().trim()]
     }${$(element).find(".c-schedule__text").text().trim()}\n`;
@@ -105,6 +112,7 @@ const analysis = (response: string) => {
     schedule.push({
       time,
       text,
+      url,
     });
   });
 
