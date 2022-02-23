@@ -7,12 +7,15 @@ import {
   middleware,
   WebhookEvent,
   MessageAPIResponseBase,
+  Message,
+  FlexBubble,
 } from "@line/bot-sdk";
 
 interface ScheduleType {
-  time: string;
   text: string;
-  url: string;
+  category: string;
+  uri: string;
+  time: string;
 }
 
 dotenv.config();
@@ -37,6 +40,83 @@ app.post("/webhook", middleware(config), (req, res) => {
   );
 });
 
+const textMessage = (text: string): Message => ({
+  type: "text",
+  text,
+});
+
+const flexMessageTemplate = (schedules: ScheduleType[]): Message => {
+  const contents: FlexBubble[] = schedules.map((item) => ({
+    type: "bubble",
+    size: "nano",
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: item.text,
+              weight: "bold",
+              wrap: true,
+              size: "md",
+            },
+          ],
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            {
+              type: "text",
+              text: item.category,
+              size: "sm",
+            },
+            {
+              type: "text",
+              text: item.time,
+              align: "end",
+              size: "sm",
+            },
+          ],
+          margin: "lg",
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "separator",
+        },
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "詳細",
+            uri: item.uri,
+          },
+          height: "sm",
+          margin: "lg",
+        },
+      ],
+    },
+  }));
+
+  return {
+    type: "flex",
+    altText: "本日の予定",
+    contents: {
+      type: "carousel",
+      contents,
+    },
+  };
+};
+
 /** 特定の文字列に反応し、リプライする */
 const replayMessage = async (
   event: WebhookEvent
@@ -45,27 +125,23 @@ const replayMessage = async (
     return Promise.resolve(null);
   }
 
-  let text = "";
+  let message: Message;
 
   if (event.message.text === "予定") {
     const response = await scraping();
 
     if (response) {
-      const schedule = analysis(response);
-      text = schedule
-        .map((item) => `${item.time}${item.text}${item.url}`)
-        .join("\n");
+      const schedules = analysis(response);
+      console.log(schedules);
+      message = flexMessageTemplate(schedules);
     } else {
-      text = "問題が発生しました";
+      message = textMessage("問題が発生しました");
     }
   } else {
-    text = "負けるな！しょげるな！林瑠奈です！";
+    message = textMessage("負けるな！しょげるな！林瑠奈です！");
   }
 
-  return client.replyMessage(event.replyToken, {
-    type: "text",
-    text,
-  });
+  return client.replyMessage(event.replyToken, message);
 };
 
 /** urlからスクレイピングした結果を文字列で返す */
@@ -84,35 +160,25 @@ const scraping = async () => {
 const analysis = (response: string) => {
   const schedule: ScheduleType[] = [];
 
-  const categoryType: {
-    [key: string]: string;
-  } = {
-    テレビ: "📺",
-    WEB: "🖥",
-    ラジオ: "📻",
-    配信: "🚀",
-    雑誌: "📖",
-    誕生日: "🎂",
-  };
-
   const $ = cheerio.load(response);
   $(".p-schedule__item").each((_, element) => {
-    const time = $(element).find(".c-schedule__time--list").text().trim()
-      ? `⏰${$(element).find(".c-schedule__time--list").text().trim()}\n`
-      : "";
-
-    const url = `🔍https://www.hinatazaka46.com${$(element)
+    const text = $(element).find(".c-schedule__text").text().trim();
+    const category = $(element).find(".c-schedule__category").text().trim();
+    const uri = `https://www.hinatazaka46.com${$(element)
       .find("a")
-      .attr("href")}\n`;
-
-    const text = `${
-      categoryType[$(element).find(".c-schedule__category").text().trim()]
-    }${$(element).find(".c-schedule__text").text().trim()}\n`;
+      .attr("href")}`;
+    const time =
+      $(element)
+        .find(".c-schedule__time--list")
+        .text()
+        .trim()
+        .replace(/～/g, "") || " ";
 
     schedule.push({
-      time,
       text,
-      url,
+      category,
+      uri,
+      time,
     });
   });
 
