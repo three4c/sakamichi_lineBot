@@ -128,11 +128,12 @@ const replayMessage = async (
   let message: Message;
 
   if (event.message.text === "予定") {
-    const response = await scraping();
+    const response = await scraping(
+      "https://www.hinatazaka46.com/s/official/media/list"
+    );
 
     if (response) {
       const schedules = analysis(response);
-      console.log(schedules);
       message = flexMessageTemplate(schedules);
     } else {
       message = textMessage("問題が発生しました");
@@ -145,11 +146,9 @@ const replayMessage = async (
 };
 
 /** urlからスクレイピングした結果を文字列で返す */
-const scraping = async () => {
+const scraping = async (url: string) => {
   try {
-    const response = await axios.get<string>(
-      "https://www.hinatazaka46.com/s/official/media/list"
-    );
+    const response = await axios.get<string>(url);
     return response.data;
   } catch (error) {
     return "";
