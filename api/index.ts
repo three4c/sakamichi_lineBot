@@ -128,7 +128,7 @@ const replayMessage = async (
   let message: Message;
 
   if (event.message.text === "予定") {
-    const response = await scraping(
+    const response = await getScraping(
       "https://www.hinatazaka46.com/s/official/media/list"
     );
 
@@ -146,7 +146,7 @@ const replayMessage = async (
 };
 
 /** urlからスクレイピングした結果を文字列で返す */
-const scraping = async (url: string) => {
+const getScraping = async (url: string) => {
   try {
     const response = await axios.get<string>(url);
     return response.data;
@@ -183,6 +183,20 @@ const analysis = (response: string) => {
 
   return schedule;
 };
+
+// const getApi = async () => {
+//   const response = await axios
+//     .get<string>(
+//       "https://www.nogizaka46.com/s/n46/api/list/schedule?dy=20220224&callback=res"
+//     )
+//     .then((res) => res.data);
+//   console.log(
+//     "title",
+//     response.match(
+//       /"(title|text|date|start_time|end_time|cate|link)":"(.*?)(?<!\\)"/g
+//     )
+//   );
+// };
 
 app.listen(PORT);
 console.log(`Server running at ${PORT}`);
