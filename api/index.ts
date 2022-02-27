@@ -133,7 +133,7 @@ const replayMessage = async (
     );
 
     if (response) {
-      const schedules = analysis(response);
+      const schedules = analysisDom(response);
       message = flexMessageTemplate(schedules);
     } else {
       message = textMessage("問題が発生しました");
@@ -156,7 +156,7 @@ const getScraping = async (url: string) => {
 };
 
 /** 文字列をDOM解析し、整形する */
-const analysis = (response: string) => {
+const analysisDom = (response: string) => {
   const schedule: ScheduleType[] = [];
 
   const $ = cheerio.load(response);
@@ -184,12 +184,8 @@ const analysis = (response: string) => {
   return schedule;
 };
 
-// const getApi = async () => {
-//   const response = await axios
-//     .get<string>(
-//       "https://www.nogizaka46.com/s/n46/api/list/schedule?dy=20220224&callback=res"
-//     )
-//     .then((res) => res.data);
+// const getApi = async (url: string) => {
+//   const response = await axios.get<string>(url).then((res) => res.data);
 //   console.log(
 //     "title",
 //     response.match(
@@ -197,6 +193,8 @@ const analysis = (response: string) => {
 //     )
 //   );
 // };
+
+// console.log(getApi("https://www.nogizaka46.com/s/n46/api/list/schedule"));
 
 app.listen(PORT);
 console.log(`Server running at ${PORT}`);
